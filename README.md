@@ -157,6 +157,11 @@ Para cada servicio identificado, justifiquen la estrategia de datos usando las c
     - **Modelo de equipos**: Este módulo es gestionado por un único equipo (equipo de experiencia), lo que facilita la coordinación y el mantenimiento.
     - **Escenario**: Este módulo tiene su propia base de datos.
 
+  - **Plan de migración para tablas en zona gris**:
+    - `repartidores`: Operaciones escribe (estado, capacidad) y Experiencia lee (posición, identidad). Hoy vive con Operaciones porque la escritura es su responsabilidad principal. El acceso de Experiencia se expone mediante REST, no acceso directo a la tabla. **Señal concreta para separar en 12 meses**: Si Experiencia necesita índices geoespaciales sobre repartidores que entren en conflicto con los índices transaccionales de Operaciones, se extrae la información de posición al servicio de Georeferenciación con sincronización por eventos.
+
+    - `eventos_rastreo`: Experiencia escribe con cada cambio de estado relevante, pero Operaciones también los lee para su reporting. Hoy vive con Experiencia porque la escritura es su responsabilidad principal. El acceso de Operaciones se expone mediante REST, no acceso directo a la tabla. **Señal concreta para separar en 12 meses**: Si Operaciones hace joins regulares entre eventos_rastreo y ordenes para reportes de gestión, se replica la tabla hacia el schema de Operaciones con consistencia eventual, o se crea un servicio de reporting independiente que consolide ambas fuentes.
+
 ### Pregunta 4
 
 Tomen la decisión más difícil de su diseño — la tabla o la relación entre servicios donde hubo más debate — y justifíquenla usando los números del Bloque 3: latencia, costo operacional y disponibilidad compuesta. ¿El precio de distribuir está justificado por la presión operacional del escenario? Si el SLA de rastreo baja a 10 segundos el próximo trimestre, ¿cambia alguna decisión de su diseño? ¿Cuál y por qué?
