@@ -173,3 +173,47 @@ Tomen la decisión más difícil de su diseño — la tabla o la relación entre
   Convertir la base de datos de georeferenciación en una tecnología **NoSQL optimizada para consultas geoespaciales**, como MongoDB, puede **mejorar significativamente la latencia de las consultas de ubicación**, lo que es crucial para cumplir con el SLA de actualización de posición con no más de 30 segundos de latencia. Además, esta separación permite que el equipo de experiencia pueda iterar sobre el algoritmo de predicción de tiempos de entrega sin afectar al equipo de operaciones, lo que mejora la eficiencia y reduce el riesgo de incidentes en facturación.
 
   Si el SLA de rastreo baja a 10 segundos el próximo trimestre, esta decisión se vuelve aún más justificada, ya que la presión operacional sobre el módulo de georeferenciación aumentaría aún más. En este caso, sería crucial mantener la separación para garantizar que el módulo de georeferenciación pueda cumplir con el nuevo SLA sin afectar al resto del sistema. Además, se podrían implementar optimizaciones adicionales en la base de datos y en la lógica del servicio para asegurar que se cumpla el nuevo requisito de latencia.
+
+---
+
+## Parte 3: Las áreas del negocio cambian y con ellas los requisitos
+
+### Descripción de cambios
+
+El sistema de dos servicios que diseñaron en Clase 2 sigue en producción, pero han aparecido tres presiones nuevas que hacen insostenible el estado actual:
+
+Presión 1 — El equipo de Operaciones se dividió en tres.
+El equipo creció y se especializó en tres sub-equipos: Órdenes, Asignación y Facturación. Cada sub-equipo trabaja en sprints independientes con prioridades distintas, pero comparten el mismo servicio y el mismo pipeline de CI/CD. Un bugfix en Facturación requiere coordinar el release con los otros dos sub-equipos, aunque el cambio sea de dos líneas. En el último mes hubo tres releases bloqueados por más de una semana por esta coordinación.
+
+Presión 2 — El equipo de Asignación necesita ML.
+El sub-equipo de Asignación va a reemplazar el algoritmo de asignación actual por un modelo de ML entrenado en datos históricos. El modelo requiere Python 3.11 con librerías específicas de ML (PyTorch, scikit-learn) que crean conflictos de versiones con otras dependencias del servicio de Operaciones. Llevan 6 semanas bloqueados sin poder introducir ninguna dependencia nueva.
+
+Presión 3 — Facturación necesita aislamiento PCI-DSS.
+Un auditor de seguridad determinó que para cumplir PCI-DSS, los datos de pago y facturación deben estar completamente aislados: base de datos propia con acceso restringido, audit trail independiente, y controles de acceso que el código compartido actual hace imposible de garantizar. El plazo del auditor es de 90 días.
+
+Más el incidente abierto de Clase 2:
+La tabla repartidores sigue siendo un punto de fricción. La semana pasada el equipo de Rastreo desplegó una migración de esquema en su ventana de mantenimiento que, por un error de coordinación, afectó la tabla repartidores y dejó el servicio de Operaciones en un estado inconsistente durante 4 horas. El post-mortem señala que el acoplamiento de esquema entre los dos equipos es insostenible.
+
+[ver ejercicio completo](https://docs.google.com/document/d/1H5W-rL4uV3mZjuzwYE7e-RlgXqVi4qWJss860aEBBfs/edit?tab=t.0)
+
+### Pregunta 1
+
+¿Qué partes de Operaciones se convierten en microservicios independientes? Para cada microservicio propuesto justifiquen usando: Conway's Law (¿tiene equipo propio?), requisito de escala diferencial (¿escala de manera distinta al resto?), o requisito de aislamiento técnico o regulatorio. ¿Qué permanece junto y por qué?
+
+### Pregunta 2
+
+Diseñen el nuevo C4 nivel 2 de FleetCore mostrando todos los microservicios identificados, el API Gateway, las bases de datos propias de cada servicio, y el modelo de comunicación entre ellos. Indiquen explícitamente qué llamadas son síncronas y cuáles son asíncronas, y por qué.
+
+- **Respuesta**:
+![Diagrama C4 nivel 2](/resources/escenario_3.drawio.png)
+
+  - **Llamados asíncronos**:
+  - **Llamados síncronos**:
+
+### Pregunta 3
+
+Cuando un cliente crea un pedido, el sistema debe: (1) registrar la orden, (2) asignar un repartidor disponible, y (3) inicializar la factura. Diseñen la saga para esta operación. Muestren la ruta feliz y todas las rutas de compensación. ¿Eligen orquestación o coreografía? Justifiquen. ¿Qué pasa si el paso de asignación falla después de que la orden ya fue creada?
+
+### Pregunta 4
+
+El incidente de 4 horas cerró el debate de Clase 2. Con cuatro equipos autónomos y cuatro servicios con bases de datos propias, diseñen la solución definitiva para la tabla repartidores. ¿Justifica ahora la sincronización por eventos? Argumenten usando: Conway's Law aplicada al estado actual del equipo, las cuatro variables de Clase 2, y el costo operacional del incidente. ¿Qué esquema de evento proponen y quién lo emite?
