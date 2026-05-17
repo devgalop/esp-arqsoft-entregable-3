@@ -200,6 +200,20 @@ La tabla repartidores sigue siendo un punto de fricción. La semana pasada el eq
 
 ¿Qué partes de Operaciones se convierten en microservicios independientes? Para cada microservicio propuesto justifiquen usando: Conway's Law (¿tiene equipo propio?), requisito de escala diferencial (¿escala de manera distinta al resto?), o requisito de aislamiento técnico o regulatorio. ¿Qué permanece junto y por qué?
 
+- **Respuesta**:
+
+  - El **servicio de facturación** debe convertirse en un microservicio independiente debido a los requisitos de aislamiento técnico y regulatorio impuestos por PCI-DSS. Al tener su propia base de datos con acceso restringido, audit trail independiente y controles de acceso específicos, se garantiza que los datos de pago y facturación estén completamente aislados del resto del sistema, lo que es crucial para cumplir con las normativas de seguridad.
+
+  - El **servicio de asignación** también debe convertirse en un microservicio independiente debido a los requisitos técnicos relacionados con el uso de Python 3.11 y las librerías específicas de ML (PyTorch, scikit-learn). Al tener su propio servicio, el equipo de asignación puede gestionar sus dependencias sin generar conflictos con otras partes del sistema, lo que mejora la eficiencia y reduce el riesgo de bloqueos.
+
+  - El **servicio de órdenes**  se convierte en un microservicio independiente debido a que el equipo de órdenes tiene prioridades distintas a los otros sub-equipos y necesita poder desplegar de manera independiente sin afectar a los otros módulos.
+
+  - El **servicio de notificaciones** se convierte en un microservicio independiente debido a que este actúa como un servicio transversal que es activado por los demás servicios a través de eventos, lo que justifica su separación para evitar acoplamientos innecesarios entre los módulos.
+
+  - El **servicio de reporting** se convierte en un microservicio independiente debido a que este también actúa como un servicio transversal que necesita de la interacción con otros servicios, lo que justifica su separación para evitar acoplamientos innecesarios entre los módulos.
+
+  - El **servicio de georeferenciación** es un microservicio que tiene sus propias necesidades de escalado y despliegue, por lo que se mantiene como un microservicio independiente.
+
 ### Pregunta 2
 
 Diseñen el nuevo C4 nivel 2 de FleetCore mostrando todos los microservicios identificados, el API Gateway, las bases de datos propias de cada servicio, y el modelo de comunicación entre ellos. Indiquen explícitamente qué llamadas son síncronas y cuáles son asíncronas, y por qué.
@@ -208,11 +222,17 @@ Diseñen el nuevo C4 nivel 2 de FleetCore mostrando todos los microservicios ide
 ![Diagrama C4 nivel 2](/resources/escenario_3.drawio.png)
 
   - **Llamados asíncronos**:
+    - Todos los llamados para notificaciones son asíncronos, gestionados a través de eventos, ya que las notificaciones no necesitan ser procesadas en tiempo real para garantizar la funcionalidad del sistema.
   - **Llamados síncronos**:
+    - El proceso de creación de una orden debe ser síncrono, orquestado por un medidor de saga, para garantizar que se registren correctamente la orden, se asigne un repartidor disponible y se inicialice la factura. Esto es crucial para mantener la consistencia del sistema y asegurar que todas las partes involucradas en el proceso de creación de una orden estén coordinadas.
+    - El proceso de asignación de repartidores también debe ser síncrono, ya que es una parte crítica del flujo de trabajo y requiere una respuesta inmediata para garantizar una experiencia de usuario fluida.
+    - El proceso de facturación debe ser síncrono para garantizar que se generen correctamente las facturas y se cumplan los requisitos de PCI-DSS, lo que es crucial para la seguridad y el cumplimiento normativo.
+    - La generación de reportes también debe ser síncrona, ya que los reportes pueden requerir datos en tiempo real para proporcionar información precisa y relevante a los usuarios. Esto implica que el mediador de saga debe coordinar la recopilación de datos de los diferentes servicios para generar los reportes de manera eficiente y oportuna.
 
 ### Pregunta 3
 
 Cuando un cliente crea un pedido, el sistema debe: (1) registrar la orden, (2) asignar un repartidor disponible, y (3) inicializar la factura. Diseñen la saga para esta operación. Muestren la ruta feliz y todas las rutas de compensación. ¿Eligen orquestación o coreografía? Justifiquen. ¿Qué pasa si el paso de asignación falla después de que la orden ya fue creada?
+
 
 ### Pregunta 4
 
