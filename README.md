@@ -233,7 +233,38 @@ Diseñen el nuevo C4 nivel 2 de FleetCore mostrando todos los microservicios ide
 
 Cuando un cliente crea un pedido, el sistema debe: (1) registrar la orden, (2) asignar un repartidor disponible, y (3) inicializar la factura. Diseñen la saga para esta operación. Muestren la ruta feliz y todas las rutas de compensación. ¿Eligen orquestación o coreografía? Justifiquen. ¿Qué pasa si el paso de asignación falla después de que la orden ya fue creada?
 
+- **Respuesta**:
+
+  Para la operación de creación de un pedido, se opta por una **orquestación** utilizando un mediador de saga, ya que esto permite un control centralizado del flujo de trabajo y facilita la gestión de las rutas de compensación en caso de fallos.
+
+  - **Ruta feliz**:
+    1. El cliente crea una orden a través del API Gateway.
+    2. El mediador de saga recibe la solicitud y envía un comando al servicio de órdenes para registrar la orden.
+    3. Una vez que la orden es registrada exitosamente, el mediador de saga envía un comando al servicio de asignación para asignar un repartidor disponible.
+    4. Si la asignación es exitosa, el mediador de saga envía un comando al servicio de facturación para inicializar la factura.
+    5. Finalmente, el mediador de saga envía un evento para notificar al cliente sobre el estado de su orden.
+
+  - **Rutas de compensación**:
+    - Si el paso de asignación falla después de que la orden ya fue creada, el mediador de saga debe enviar un comando al servicio de órdenes para cancelar o marcar la orden como pendiente hasta que se pueda resolver el problema con la asignación. Además, se debe enviar una notificación al cliente informando sobre el retraso o problema con su orden.
+
+    - Si el paso de facturación falla después de que la asignación fue exitosa, el mediador de saga debe enviar un comando al servicio de asignación para liberar al repartidor asignado y enviar una notificación al cliente informando sobre el problema con la facturación.
+
+  Esta estrategia permite manejar los fallos de manera eficiente y garantiza que el sistema pueda recuperarse sin generar inconsistencias o afectar negativamente la experiencia del cliente.
 
 ### Pregunta 4
 
 El incidente de 4 horas cerró el debate de Clase 2. Con cuatro equipos autónomos y cuatro servicios con bases de datos propias, diseñen la solución definitiva para la tabla repartidores. ¿Justifica ahora la sincronización por eventos? Argumenten usando: Conway's Law aplicada al estado actual del equipo, las cuatro variables de Clase 2, y el costo operacional del incidente. ¿Qué esquema de evento proponen y quién lo emite?
+
+- **Respuesta**:
+
+  La solución para la tabla `repartidores` es **sincronizar la información de los repartidores a través de eventos**.Con cuatro equipos autónomos, cada uno gestionando su propio servicio, es natural que cada equipo tenga su propia base de datos para evitar conflictos y facilitar la autonomía. La sincronización por eventos permite que cada equipo gestione su propia copia de la información de los repartidores sin necesidad de acceder directamente a una tabla compartida, lo que reduce el acoplamiento entre los equipos.
+
+  - **Variables de Clase 2**:
+    - **Quién escribe**: El equipo de asignación es el principal responsable de escribir la información de los repartidores (estado, capacidad), mientras que otros equipos como el de órdenes o notificaciones pueden necesitar leer esta información para sus procesos.
+    - **Frecuencia de cambio del esquema**: La tabla `repartidores` puede requerir cambios frecuentes debido a nuevas funcionalidades o mejoras en la gestión de repartidores, lo que hace que una base de datos compartida sea propensa a conflictos.
+    - **Requisitos de consistencia**: La consistencia eventual es suficiente para la información de los repartidores, ya que no es crítico que todos los servicios tengan la información actualizada en tiempo real, siempre y cuando se mantenga dentro del SLA establecido.
+    - **Modelo de equipos**: Con cuatro equipos autónomos, es crucial minimizar las dependencias entre ellos para garantizar una mayor eficiencia y reducir el riesgo de bloqueos.
+
+  - **Costo operacional del incidente**: El incidente causó una interrupción significativa en el servicio durante 4 horas, lo que afectó negativamente la experiencia del cliente y generó costos operacionales considerables. Al implementar una solución basada en eventos, se reduce el riesgo de incidentes similares en el futuro, ya que cada equipo puede gestionar su propia base de datos sin afectar a los demás. Sin embargo, es importante implementar mecanismos de monitoreo y alertas para detectar cualquier inconsistencia en la información de los repartidores y garantizar que se mantenga dentro del SLA establecido.
+
+  - **Esquema de evento propuesto**: Se propone un esquema de evento llamado `RepartidorActualizado`, emitido por el servicio de asignación cada vez que hay un cambio relevante en la información del repartidor (por ejemplo, cambio de estado o capacidad). Este evento incluiría los datos necesarios para que otros servicios puedan actualizar su propia copia de la información de los repartidores de manera eficiente y mantener la consistencia eventual en todo el sistema.
